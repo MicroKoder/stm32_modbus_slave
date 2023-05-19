@@ -11,9 +11,14 @@
 #include <stdbool.h>
 #include <stdint-gcc.h>
 
+#define FC_READ_DO 1
+#define FC_READ_DI 2
 #define FC_READ_AO 3
 #define FC_READ_AI 4
+#define FC_WRITE_DO 5
 #define FC_WRITE_AO 6
+#define FC_WRITE_DOs 0xF
+#define FC_WRITE_AOs 0x10
 
 #define MB_PORTS_COUNT 2
 #define MB_MAX_DEVICES_COUNT 4
