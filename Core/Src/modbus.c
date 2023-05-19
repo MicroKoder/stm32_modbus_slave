@@ -8,6 +8,7 @@
 #include "modbus.h"
 #include "crc16.h"
 #include <stdlib.h>
+#include <string.h>
 typedef struct
 {
 	uint16_t holdingRegCnt;
@@ -65,6 +66,7 @@ static uint16_t GetAO(MODBUS_device_t* device, uint8_t nreg);
 static void SetAO(MODBUS_device_t* device, uint8_t startreg, uint16_t value);
 static void GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest);
 static void GetDI(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest);
+static void SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value);
 
 static bool IsAlreadyExist(uint8_t nPort, uint8_t ID)
 {
@@ -234,19 +236,17 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 					(*answerLen) = nreg*2 + 5;
 
 				 break;
+
+				case FC_WRITE_DO:
+					SetCoil(&mb_port[nPort].device[index], startreg, value == 0xFF00 ? 1 : 0);
+
+					memcpy(pAnswer, data, 8);
+					(*answerLen) = 8;
+				break;
 				case FC_WRITE_AO:
 
 					SetAO(&mb_port[nPort].device[index], startreg, value);
-
-
-					pAnswer[0] = data[0];
-					pAnswer[1] = data[1];
-					pAnswer[2] = data[2];
-					pAnswer[3] = data[3];
-					pAnswer[4] = data[4];
-					pAnswer[5] = data[5];
-					pAnswer[6] = data[6];
-					pAnswer[7] = data[7];
+					memcpy(pAnswer, data, 8);
 
 					(*answerLen) = 8;
 
@@ -318,5 +318,16 @@ static void GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, ui
 		{
 			dest[i/8] |= ((device->Coils[(startreg+i)/8] >> ((startreg+i)%8)) & 1) << (i%8);
 		}
+	}
+}
+
+static void SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value)
+{
+	if (startreg < device->coilCnt)
+	{
+		if (value)
+			device->Coils[startreg/8] |= 1 << (startreg%8);
+		else
+			device->Coils[startreg/8] &= ~(1 << (startreg%8));
 	}
 }
