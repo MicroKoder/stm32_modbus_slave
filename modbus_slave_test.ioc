@@ -1,7 +1,7 @@
 #MicroXplorer Configuration settings - do not modify
 FREERTOS.FootprintOK=true
 FREERTOS.IPParameters=Tasks01,FootprintOK,configUSE_NEWLIB_REENTRANT
-FREERTOS.Tasks01=port1Task,0,128,StartPort1Task,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.Tasks01=port1Task,0,128,StartPort1Task,Default,NULL,Dynamic,NULL,NULL;port2Task,-3,128,StartPort2Task,Default,NULL,Dynamic,NULL,NULL
 FREERTOS.configUSE_NEWLIB_REENTRANT=1
 File.Version=6
 KeepUserPlacement=false

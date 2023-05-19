@@ -11,5 +11,6 @@
 #include "stm32f1xx_hal.h"
 #include "cmsis_os.h"
 void processTask1();
+void processTask2();
 
 #endif /* INC_APP_TASKS_H_ */

@@ -74,10 +74,23 @@ void processTask1()
 	{
 		if (processReceive(&appData.portData[0])== APP_FINISHED)
 		{
-			HAL_UART_Transmit_IT(appData.portData[0].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
+			//HAL_UART_Transmit_IT(appData.portData[0].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
 		}
 		osDelay(1);
 	}
 
+}
+
+void processTask2()
+{
+	HAL_UART_Receive_IT(&huart2, appData.portData[1].rxData, RX_BUF_SIZE);
+		for(;;)
+		{
+			if (processReceive(&appData.portData[1])== APP_FINISHED)
+			{
+			//	HAL_UART_Transmit_IT(appData.portData[1].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
+			}
+			osDelay(1);
+		}
 }
 

@@ -49,6 +49,7 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 osThreadId port1TaskHandle;
+osThreadId port2TaskHandle;
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -59,6 +60,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 void StartPort1Task(void const * argument);
+void StartPort2Task(void const * argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -126,6 +128,10 @@ int main(void)
   /* definition and creation of port1Task */
   osThreadDef(port1Task, StartPort1Task, osPriorityNormal, 0, 128);
   port1TaskHandle = osThreadCreate(osThread(port1Task), NULL);
+
+  /* definition and creation of port2Task */
+  osThreadDef(port2Task, StartPort2Task, osPriorityIdle, 0, 128);
+  port2TaskHandle = osThreadCreate(osThread(port2Task), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -286,6 +292,21 @@ void StartPort1Task(void const * argument)
 
 	processTask1();
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartPort2Task */
+/**
+* @brief Function implementing the port2Task thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPort2Task */
+void StartPort2Task(void const * argument)
+{
+  /* USER CODE BEGIN StartPort2Task */
+  /* Infinite loop */
+	processTask2();
+  /* USER CODE END StartPort2Task */
 }
 
 /**
