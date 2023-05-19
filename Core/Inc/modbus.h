@@ -26,6 +26,6 @@ typedef enum
 MODBUSResult_t;
 
 MODBUSResult_t MODBUS_AddDevice(uint8_t nPort, uint8_t ID, uint16_t inputCnt, uint16_t coilCnt, uint16_t inputRegCnt, uint16_t holdingRegCnt);
-MODBUSResult_t ProcessModbusRequest(uint8_t *data, uint8_t len);
+MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, uint8_t *pAnswer, uint16_t *answerLen);
 
 #endif /* INC_MODBUS_H_ */

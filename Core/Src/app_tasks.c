@@ -8,13 +8,16 @@
 
 #include "app_tasks.h"
 #include <stdbool.h>
+#include "modbus.h"
 #define RX_BUF_SIZE 256
-
+#define TX_BUF_SIZE 256
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
 
 typedef struct{
 	uint8_t rxData[RX_BUF_SIZE];
+	uint8_t txData[TX_BUF_SIZE];
+	uint16_t txLen;
 	uint16_t receivedCount;
 	uint16_t prevCount;
 	UART_HandleTypeDef *huart;
@@ -75,6 +78,8 @@ void processTask1()
 		if (processReceive(&appData.portData[0])== APP_FINISHED)
 		{
 			//HAL_UART_Transmit_IT(appData.portData[0].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
+			if (MODBUS_ProcessRequest(0, appData.portData[0].rxData, appData.portData[0].receivedCount, appData.portData[0].txData, &appData.portData[0].txLen)==MODBUS_OK)
+				HAL_UART_Transmit_IT(appData.portData[0].huart, appData.portData[0].txData, appData.portData[0].txLen);
 		}
 		osDelay(1);
 	}

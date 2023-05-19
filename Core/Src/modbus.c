@@ -6,6 +6,8 @@
  */
 
 #include "modbus.h"
+#include "crc16.h"
+#include <stdlib.h>
 typedef struct
 {
 	uint16_t holdingRegCnt;
@@ -57,10 +59,10 @@ static MODBUS_port_t mb_port[MB_PORTS_COUNT]={
 		}
 };
 
-static uint16_t GetAI(uint8_t nreg);
-static uint16_t GetAO(uint8_t nreg);
-static void SetAI(uint8_t nreg, uint16_t value);
-static void SetAO(uint8_t nreg, uint16_t value);
+static uint16_t GetAI(MODBUS_device_t* device, uint8_t nreg);
+static uint16_t GetAO(MODBUS_device_t* device, uint8_t nreg);
+//static void SetAI(MODBUS_device_t* device, uint8_t nreg, uint16_t value);
+static void SetAO(MODBUS_device_t* device, uint8_t nreg, uint16_t value);
 
 static bool IsAlreadyExist(uint8_t nPort, uint8_t ID)
 {
@@ -70,6 +72,18 @@ static bool IsAlreadyExist(uint8_t nPort, uint8_t ID)
 			return true;
 	}
 	return false;
+}
+MODBUSResult_t GetDeviceIndexByID(uint8_t nPort, uint8_t ID, uint8_t *index)
+{
+	for (uint8_t i=0; i<mb_port[nPort].deviceCount; i++)
+	{
+		if (mb_port[nPort].device[i].ID == ID)
+		{
+			(*index)=i;
+			return MODBUS_OK;
+		}
+	}
+	return MODBUS_ERROR;
 }
 MODBUSResult_t MODBUS_AddDevice(uint8_t nPort, uint8_t ID, uint16_t inputCnt, uint16_t coilCnt, uint16_t inputRegCnt, uint16_t holdingRegCnt)
 {
@@ -112,21 +126,28 @@ bool IsCRCValid(uint8_t *data, uint8_t len)
 	return (*pPackageCRC) == crc;
 }
 
-MODBUSResult_t MODBUS_ProcessRequest(uint8_t *data, uint8_t len, uint8_t *pAnswer, uint16_t *answerLen)
+MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, uint8_t *pAnswer, uint16_t *answerLen)
 {
 	uint8_t fc;
 	uint16_t startreg;
 	uint16_t nreg;
 	uint16_t value;
 	uint16_t crc;
+	uint8_t id;
+	uint8_t index=0;	//device index
 	MODBUSResult_t res = MODBUS_OK;
 
 	if (IsCRCValid(data, len))
 	{
-		/*	fc = data[1];
+			id = data[0];
+			if (GetDeviceIndexByID(nPort, id, &index) != MODBUS_OK)
+				return MODBUS_ERROR;
+
+			fc = data[1];
 			startreg = (data[2]<<8) + data[3];
 			nreg =  (data[4]<<8) + data[5];
 			value = nreg;
+
 			switch(fc)
 			{
 				case FC_READ_AI:
@@ -135,12 +156,13 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t *data, uint8_t len, uint8_t *pAnswe
 						pAnswer[0] = data[0];
 						pAnswer[1] = fc;
 						pAnswer[2] = 2;
-						pAnswer[3] = GetAI(startreg)>>8;
-						pAnswer[4] = GetAI(startreg) & 0xFF;
+						pAnswer[3] = GetAI(&mb_port[nPort].device[index], startreg)>>8;
+						pAnswer[4] = GetAI(&mb_port[nPort].device[index], startreg) & 0xFF;
 						crc = CRC16(pAnswer, 5);
 						pAnswer[5] = crc & 0xff;
 						pAnswer[6] = crc >> 8;
 
+						(*answerLen) = 7;
 
 					} break;
 				case FC_READ_AO:
@@ -150,14 +172,8 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t *data, uint8_t len, uint8_t *pAnswe
 					pAnswer[2] = nreg*2;
 					for(int i=0; i< nreg; i++)
 					{
-						if ((startreg+i) < AO_REGISTERS_COUNT)
-						{
-							value = GetAO(startreg + i);
-						}else if ((startreg+i) >=100  && startreg<(paramsCnt+100))
-						{
-							value = getParam(startreg+i - 100);
-						}else
-							value = 0;
+
+						value = GetAO(&mb_port[nPort].device[index], startreg + i);
 
 						pAnswer[i*2 + 3] = value >>8;
 						pAnswer[i*2 + 4] = value & 0xFF;
@@ -166,12 +182,13 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t *data, uint8_t len, uint8_t *pAnswe
 					pAnswer[nreg*2 + 3] = crc & 0xff;
 					pAnswer[nreg*2 + 4] = crc >> 8;
 
+					(*answerLen) = nreg*2 + 5;
+
 				 break;
 				case FC_WRITE_AO:
-					if (startreg < AO_REGISTERS_COUNT)
-					{
-						SetAO(startreg, value);
-					}
+
+					SetAO(&mb_port[nPort].device[index], startreg, value);
+
 
 					pAnswer[0] = data[0];
 					pAnswer[1] = data[1];
@@ -182,9 +199,43 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t *data, uint8_t len, uint8_t *pAnswe
 					pAnswer[6] = data[6];
 					pAnswer[7] = data[7];
 
+					(*answerLen) = 8;
 
 				break;
 			}//switch
-*/
+
 		}//crc valid
+
+	return res;
 }
+
+
+uint16_t GetAI(MODBUS_device_t* device, uint8_t nreg)
+{
+	if (nreg < device->inputRegCnt)
+		return device->AIRegisters[nreg];
+	else
+		return 0;
+}
+
+uint16_t GetAO(MODBUS_device_t* device, uint8_t nreg)
+{
+	if (nreg < device->holdingRegCnt)
+		return device->AORegisters[nreg];
+	else
+		return 0;
+}
+
+/*void SetAI(MODBUS_device_t* device, uint8_t nreg, uint16_t value)
+{
+	if (nreg < device->inputRegCnt)
+		device->AIRegisters[nreg]=value;
+}*/
+
+void SetAO(MODBUS_device_t* device, uint8_t nreg, uint16_t value)
+{
+	if (nreg < device->holdingRegCnt)
+		device->AORegisters[nreg]=value;
+}
+
+
