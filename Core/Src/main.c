@@ -33,10 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MB_INPUTS_COUNT 160
-#define MB_COILS_COUNT 160
-#define MB_INPUT_REG_COUNT 8
-#define MB_HOLDING_REG_COUNT 10
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -102,10 +99,8 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  MODBUS_AddDevice(0, 1, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
-  MODBUS_AddDevice(0, 2, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
-  MODBUS_AddDevice(1, 1, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
-  MODBUS_AddDevice(1, 2, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
+  Initialization();
+
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -290,7 +285,7 @@ void StartPort1Task(void const * argument)
   /* Infinite loop */
 
 
-	processTask1();
+	ProcessTask1();
   /* USER CODE END 5 */
 }
 
@@ -305,7 +300,7 @@ void StartPort2Task(void const * argument)
 {
   /* USER CODE BEGIN StartPort2Task */
   /* Infinite loop */
-	processTask2();
+	ProcessTask2();
   /* USER CODE END StartPort2Task */
 }
 

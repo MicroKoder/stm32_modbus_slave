@@ -50,6 +50,14 @@ typedef enum {
 
 }APPReceiveStatus_t;
 
+void Initialization()
+{
+	MODBUS_AddDevice(0, 1, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
+	MODBUS_AddDevice(0, 2, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
+	MODBUS_AddDevice(1, 1, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
+	MODBUS_AddDevice(1, 2, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
+}
+
 bool IsReceivingIdle(port_data_t *port)
 {
 	return port->huart->RxXferCount == port->prevCount;
@@ -70,7 +78,7 @@ APPReceiveStatus_t processReceive(port_data_t *port)
 	port->prevCount =port->huart->RxXferCount;
 	return res;
 }
-void processTask1()
+void ProcessTask1()
 {
 	HAL_UART_Receive_IT(&huart1, appData.portData[0].rxData, RX_BUF_SIZE);
 	for(;;)
@@ -86,7 +94,7 @@ void processTask1()
 
 }
 
-void processTask2()
+void ProcessTask2()
 {
 	HAL_UART_Receive_IT(&huart2, appData.portData[1].rxData, RX_BUF_SIZE);
 		for(;;)
@@ -94,6 +102,8 @@ void processTask2()
 			if (processReceive(&appData.portData[1])== APP_FINISHED)
 			{
 			//	HAL_UART_Transmit_IT(appData.portData[1].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
+				if (MODBUS_ProcessRequest(1, appData.portData[1].rxData, appData.portData[1].receivedCount, appData.portData[1].txData, &appData.portData[1].txLen)==MODBUS_OK)
+					HAL_UART_Transmit_IT(appData.portData[1].huart, appData.portData[1].txData, appData.portData[1].txLen);
 			}
 			osDelay(1);
 		}

@@ -251,6 +251,22 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 					(*answerLen) = 8;
 
 				break;
+
+				case FC_WRITE_AOs:
+					for(int i=0; i<nreg; i++)
+					{
+						value = (data[i*2 + 7] << 8) + data[i*2 + 8];
+						SetAO(&mb_port[nPort].device[index], startreg +i, value);
+					}
+
+					memcpy(pAnswer, data, 6);
+					crc = CRC16(pAnswer, 6);
+					pAnswer[6] = crc & 0xff;
+					pAnswer[7] = crc >> 8;
+
+					(*answerLen) = 8;
+
+				break;
 			}//switch
 
 		}//crc valid
