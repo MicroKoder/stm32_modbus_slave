@@ -148,15 +148,25 @@ static bool IsCRCValid(uint8_t *data, uint8_t len)
 	return (*pPackageCRC) == crc;
 }
 
+static void AppendCRC(uint8_t *data, uint8_t len)
+{
+	uint16_t crc;
+	crc = CRC16(data, len);
+
+	data[len] = crc & 0xff;
+	data[len + 1] = crc >> 8;
+
+}
 MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, uint8_t *pAnswer, uint16_t *answerLen)
 {
 	uint8_t fc;
 	uint16_t startreg;
 	uint16_t nreg;
 	uint16_t value;
-	uint16_t crc;
+
 	uint8_t id;
 	uint8_t index=0;	//device index
+	uint8_t offset;
 	MODBUSResult_t res = MODBUS_OK;
 
 	if (IsCRCValid(data, len))
@@ -178,20 +188,16 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 				case FC_READ_DO:
 					pAnswer[2] = (nreg>0) ? (nreg-1)/8+1 : 0;
 					GetCoil(&mb_port[nPort].device[index], startreg, nreg, &pAnswer[3]);
-					crc = CRC16(pAnswer, pAnswer[2] + 3);
 
-					pAnswer[pAnswer[2] + 3] = crc & 0xff;
-					pAnswer[pAnswer[2] + 4] = crc >> 8;
+					AppendCRC(pAnswer, pAnswer[2] + 3);
 
 					(*answerLen) = pAnswer[2] + 5;
 				break;
 				case FC_READ_DI:
 					pAnswer[2] = (nreg>0) ? (nreg-1)/8+1 : 0;
 					GetDI(&mb_port[nPort].device[index], startreg, nreg, &pAnswer[3]);
-					crc = CRC16(pAnswer, pAnswer[2] + 3);
 
-					pAnswer[pAnswer[2] + 3] = crc & 0xff;
-					pAnswer[pAnswer[2] + 4] = crc >> 8;
+					AppendCRC(pAnswer, pAnswer[2] + 3);
 
 					(*answerLen) = pAnswer[2] + 5;
 				break;
@@ -208,9 +214,7 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 						pAnswer[i*2 + 3] = value >>8;
 						pAnswer[i*2 + 4] = value & 0xFF;
 					}
-					crc = CRC16(pAnswer, nreg*2 + 3);
-					pAnswer[nreg*2 + 3] = crc & 0xff;
-					pAnswer[nreg*2 + 4] = crc >> 8;
+					AppendCRC(pAnswer, nreg*2 + 3);
 
 					(*answerLen) = nreg*2 + 5;
 
@@ -229,9 +233,8 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 						pAnswer[i*2 + 3] = value >>8;
 						pAnswer[i*2 + 4] = value & 0xFF;
 					}
-					crc = CRC16(pAnswer, nreg*2 + 3);
-					pAnswer[nreg*2 + 3] = crc & 0xff;
-					pAnswer[nreg*2 + 4] = crc >> 8;
+					AppendCRC(pAnswer, nreg*2 + 3);
+
 
 					(*answerLen) = nreg*2 + 5;
 
@@ -260,12 +263,24 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 					}
 
 					memcpy(pAnswer, data, 6);
-					crc = CRC16(pAnswer, 6);
-					pAnswer[6] = crc & 0xff;
-					pAnswer[7] = crc >> 8;
-
+					AppendCRC(pAnswer, 6);
 					(*answerLen) = 8;
 
+				break;
+
+				case FC_WRITE_DOs:
+					offset = 7;
+					for(int i=0; i<nreg; i++)
+					{
+						uint8_t nbyte_src = offset + (i/8);
+						uint8_t nbit_src = i%8;
+
+						SetCoil(&mb_port[nPort].device[index], startreg+i, (data[nbyte_src]>>nbit_src) & 1);
+
+						memcpy(pAnswer, data, 6);
+						AppendCRC(pAnswer, 6);
+						(*answerLen) = 8;
+					}
 				break;
 			}//switch
 
