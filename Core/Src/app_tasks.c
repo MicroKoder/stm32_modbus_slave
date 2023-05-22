@@ -52,10 +52,10 @@ typedef enum {
 
 void Initialization()
 {
-	MODBUS_AddDevice(0, 1, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
-	MODBUS_AddDevice(0, 2, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
-	MODBUS_AddDevice(1, 1, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
-	MODBUS_AddDevice(1, 2, MB_INPUTS_COUNT, MB_COILS_COUNT, MB_INPUT_REG_COUNT, MB_HOLDING_REG_COUNT);
+	MODBUS_AddDevice(DEVICE_1_PORT, DEVICE_1_ID, 0, 0, 0, MB_HOLDING_REG_COUNT);
+	MODBUS_AddDevice(DEVICE_2_PORT, DEVICE_2_ID, 0, 0, MB_INPUT_REG_COUNT, 0);
+	MODBUS_AddDevice(DEVICE_3_PORT, DEVICE_3_ID, 0, MB_COILS_COUNT, 0, 0);
+	MODBUS_AddDevice(DEVICE_4_PORT, DEVICE_4_ID, MB_INPUTS_COUNT, 0, 0, 0);
 }
 
 bool IsReceivingIdle(port_data_t *port)
@@ -86,7 +86,7 @@ void ProcessTask1()
 		if (processReceive(&appData.portData[0])== APP_FINISHED)
 		{
 			//HAL_UART_Transmit_IT(appData.portData[0].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
-			if (MODBUS_ProcessRequest(0, appData.portData[0].rxData, appData.portData[0].receivedCount, appData.portData[0].txData, &appData.portData[0].txLen)==MODBUS_OK)
+			if (MODBUS_ProcessRequest(0, appData.portData[0].rxData, appData.portData[0].receivedCount, appData.portData[0].txData, &appData.portData[0].txLen)!=MODBUS_ERROR)
 				HAL_UART_Transmit_IT(appData.portData[0].huart, appData.portData[0].txData, appData.portData[0].txLen);
 		}
 		osDelay(1);
@@ -102,7 +102,7 @@ void ProcessTask2()
 			if (processReceive(&appData.portData[1])== APP_FINISHED)
 			{
 			//	HAL_UART_Transmit_IT(appData.portData[1].huart, appData.portData[0].rxData, appData.portData[0].receivedCount);
-				if (MODBUS_ProcessRequest(1, appData.portData[1].rxData, appData.portData[1].receivedCount, appData.portData[1].txData, &appData.portData[1].txLen)==MODBUS_OK)
+				if (MODBUS_ProcessRequest(1, appData.portData[1].rxData, appData.portData[1].receivedCount, appData.portData[1].txData, &appData.portData[1].txLen)!=MODBUS_ERROR)
 					HAL_UART_Transmit_IT(appData.portData[1].huart, appData.portData[1].txData, appData.portData[1].txLen);
 			}
 			osDelay(1);

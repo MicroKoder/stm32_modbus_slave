@@ -60,13 +60,13 @@ static MODBUS_port_t mb_port[MB_PORTS_COUNT]={
 		}
 };
 
-static uint16_t GetAI(MODBUS_device_t* device, uint8_t nreg);
-static uint16_t GetAO(MODBUS_device_t* device, uint8_t nreg);
+static MODBUSResult_t GetAI(MODBUS_device_t* device, uint8_t nreg, uint16_t *dest);
+static MODBUSResult_t GetAO(MODBUS_device_t* device, uint8_t nreg, uint16_t *dest);
 //static void SetAI(MODBUS_device_t* device, uint8_t nreg, uint16_t value);
-static void SetAO(MODBUS_device_t* device, uint8_t startreg, uint16_t value);
-static void GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest);
-static void GetDI(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest);
-static void SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value);
+static MODBUSResult_t SetAO(MODBUS_device_t* device, uint8_t startreg, uint16_t value);
+static MODBUSResult_t GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest);
+static MODBUSResult_t GetDI(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest);
+static MODBUSResult_t SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value);
 
 static bool IsAlreadyExist(uint8_t nPort, uint8_t ID)
 {
@@ -141,8 +141,7 @@ MODBUSResult_t MODBUS_AddDevice(uint8_t nPort, uint8_t ID, uint16_t inputCnt, ui
 
 static bool IsCRCValid(uint8_t *data, uint8_t len)
 {
-	if (len<8)
-		return false;
+
 	uint16_t* pPackageCRC = (uint16_t*)&data[len-2];
 	uint16_t crc = CRC16(data, len-2);
 	return (*pPackageCRC) == crc;
@@ -167,10 +166,14 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 	uint8_t id;
 	uint8_t index=0;	//device index
 	uint8_t offset;
-	MODBUSResult_t res = MODBUS_OK;
+	MODBUSResult_t res = MODBUS_ERROR;
+
+	if (len<8)
+		return MODBUS_ERROR;
 
 	if (IsCRCValid(data, len))
 	{
+			res = MODBUS_OK;
 			id = data[0];
 			if (GetDeviceIndexByID(nPort, id, &index) != MODBUS_OK)
 				return MODBUS_ERROR;
@@ -187,7 +190,7 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 			{
 				case FC_READ_DO:
 					pAnswer[2] = (nreg>0) ? (nreg-1)/8+1 : 0;
-					GetCoil(&mb_port[nPort].device[index], startreg, nreg, &pAnswer[3]);
+					res = GetCoil(&mb_port[nPort].device[index], startreg, nreg, &pAnswer[3]);
 
 					AppendCRC(pAnswer, pAnswer[2] + 3);
 
@@ -195,7 +198,7 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 				break;
 				case FC_READ_DI:
 					pAnswer[2] = (nreg>0) ? (nreg-1)/8+1 : 0;
-					GetDI(&mb_port[nPort].device[index], startreg, nreg, &pAnswer[3]);
+					res = GetDI(&mb_port[nPort].device[index], startreg, nreg, &pAnswer[3]);
 
 					AppendCRC(pAnswer, pAnswer[2] + 3);
 
@@ -209,7 +212,9 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 					for(int i=0; i< nreg; i++)
 					{
 
-						value = GetAI(&mb_port[nPort].device[index], startreg + i);
+						res = GetAI(&mb_port[nPort].device[index], startreg + i, &value);
+						if (res != MODBUS_OK)
+							break;
 
 						pAnswer[i*2 + 3] = value >>8;
 						pAnswer[i*2 + 4] = value & 0xFF;
@@ -228,7 +233,9 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 					for(int i=0; i< nreg; i++)
 					{
 
-						value = GetAO(&mb_port[nPort].device[index], startreg + i);
+						res = GetAO(&mb_port[nPort].device[index], startreg + i, &value);
+						if (res != MODBUS_OK)
+							break;
 
 						pAnswer[i*2 + 3] = value >>8;
 						pAnswer[i*2 + 4] = value & 0xFF;
@@ -241,14 +248,14 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 				 break;
 
 				case FC_WRITE_DO:
-					SetCoil(&mb_port[nPort].device[index], startreg, value == 0xFF00 ? 1 : 0);
+					res = SetCoil(&mb_port[nPort].device[index], startreg, value == 0xFF00 ? 1 : 0);
 
 					memcpy(pAnswer, data, 8);
 					(*answerLen) = 8;
 				break;
 				case FC_WRITE_AO:
 
-					SetAO(&mb_port[nPort].device[index], startreg, value);
+					res = SetAO(&mb_port[nPort].device[index], startreg, value);
 					memcpy(pAnswer, data, 8);
 
 					(*answerLen) = 8;
@@ -259,7 +266,9 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 					for(int i=0; i<nreg; i++)
 					{
 						value = (data[i*2 + 7] << 8) + data[i*2 + 8];
-						SetAO(&mb_port[nPort].device[index], startreg +i, value);
+						res = SetAO(&mb_port[nPort].device[index], startreg +i, value);
+						if (res != MODBUS_OK)
+							break;
 					}
 
 					memcpy(pAnswer, data, 6);
@@ -275,7 +284,9 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 						uint8_t nbyte_src = offset + (i/8);
 						uint8_t nbit_src = i%8;
 
-						SetCoil(&mb_port[nPort].device[index], startreg+i, (data[nbyte_src]>>nbit_src) & 1);
+						res = SetCoil(&mb_port[nPort].device[index], startreg+i, (data[nbyte_src]>>nbit_src) & 1);
+						if (res != MODBUS_OK)
+							break;
 
 						memcpy(pAnswer, data, 6);
 						AppendCRC(pAnswer, 6);
@@ -284,26 +295,45 @@ MODBUSResult_t MODBUS_ProcessRequest(uint8_t nPort, uint8_t *data, uint8_t len, 
 				break;
 			}//switch
 
+			if (res == MODBUS_WRONG_ADDR)
+			{
+				pAnswer[0] = data[0];
+				pAnswer[1] = 0x80 + fc;
+				pAnswer[2] = MB_ERROR_ADDR_CODE;
+				AppendCRC(pAnswer, 3);
+				(*answerLen) = 5;
+			}
 		}//crc valid
+
 
 	return res;
 }
 
 
-static uint16_t GetAI(MODBUS_device_t* device, uint8_t nreg)
+static MODBUSResult_t GetAI(MODBUS_device_t* device, uint8_t nreg, uint16_t *dest)
 {
 	if (nreg < device->inputRegCnt)
-		return device->AIRegisters[nreg];
+	{
+		(*dest) = device->AIRegisters[nreg];
+		return MODBUS_OK;
+	}
 	else
-		return 0;
+	{
+		return MODBUS_WRONG_ADDR;
+	}
 }
 
-static uint16_t GetAO(MODBUS_device_t* device, uint8_t nreg)
+static MODBUSResult_t GetAO(MODBUS_device_t* device, uint8_t nreg, uint16_t *dest)
 {
 	if (nreg < device->holdingRegCnt)
-		return device->AORegisters[nreg];
+	{
+		(*dest) =device->AORegisters[nreg];
+		return MODBUS_OK;
+	}
 	else
-		return 0;
+	{
+		return MODBUS_WRONG_ADDR;
+	}
 }
 
 /*void SetAI(MODBUS_device_t* device, uint8_t nreg, uint16_t value)
@@ -312,13 +342,19 @@ static uint16_t GetAO(MODBUS_device_t* device, uint8_t nreg)
 		device->AIRegisters[nreg]=value;
 }*/
 
-static void SetAO(MODBUS_device_t* device, uint8_t nreg, uint16_t value)
+static MODBUSResult_t SetAO(MODBUS_device_t* device, uint8_t nreg, uint16_t value)
 {
 	if (nreg < device->holdingRegCnt)
+	{
 		device->AORegisters[nreg]=value;
+		return MODBUS_OK;
+	}else
+	{
+		return MODBUS_WRONG_ADDR;
+	}
 }
 
-static void GetDI(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest)
+static MODBUSResult_t GetDI(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest)
 {
 
 	if ((startreg+count) <= device->inputCnt)
@@ -332,12 +368,15 @@ static void GetDI(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint
 		{
 			dest[i/8] |= ((device->Inputs[(startreg+i)/8] >> ((startreg+i)%8)) & 1) << (i%8);
 		}
+		return MODBUS_OK;
+	}else
+	{
+		return MODBUS_WRONG_ADDR;
 	}
 }
 
-static void GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest)
+static MODBUSResult_t GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, uint8_t *dest)
 {
-
 	if ((startreg+count) <= device->coilCnt)
 	{
 		for(int i=0; i< (count/8+1); i++)
@@ -349,10 +388,15 @@ static void GetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t count, ui
 		{
 			dest[i/8] |= ((device->Coils[(startreg+i)/8] >> ((startreg+i)%8)) & 1) << (i%8);
 		}
+		return MODBUS_OK;
+
+	}else
+	{
+		return MODBUS_WRONG_ADDR;
 	}
 }
 
-static void SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value)
+static MODBUSResult_t SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value)
 {
 	if (startreg < device->coilCnt)
 	{
@@ -360,5 +404,10 @@ static void SetCoil(MODBUS_device_t* device, uint8_t startreg, uint8_t value)
 			device->Coils[startreg/8] |= 1 << (startreg%8);
 		else
 			device->Coils[startreg/8] &= ~(1 << (startreg%8));
+
+		return MODBUS_OK;
+	}else
+	{
+		return MODBUS_WRONG_ADDR;
 	}
 }
